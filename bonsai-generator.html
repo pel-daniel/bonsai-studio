@@ -525,6 +525,78 @@ function addTrunkNoise(geometry, rng, amount){
   geometry.computeVertexNormals();
 }
 
+/* Procedural moss ground-cover texture: mottled green tufts with sparse bare-soil specks */
+function createMossTexture(rng){
+  const size = 180;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const hueShift = (rng() - 0.5) * 14;
+  const baseR = clamp(58 + hueShift, 0, 255), baseG = clamp(84 + hueShift * 1.1, 0, 255), baseB = clamp(50 + hueShift * 0.6, 0, 255);
+  ctx.fillStyle = `rgb(${baseR|0},${baseG|0},${baseB|0})`;
+  ctx.fillRect(0, 0, size, size);
+
+  // large mottled patches
+  for (let i = 0; i < 70; i++){
+    const cx = rng() * size, cy = rng() * size;
+    const rad = 8 + rng() * 22;
+    const delta = (rng() - 0.5) * 30;
+    const r = clamp(baseR + delta, 0, 255), g = clamp(baseG + delta * 1.1, 0, 255), b = clamp(baseB + delta * 0.6, 0, 255);
+    ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${0.2 + rng()*0.2})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rad, rad * (0.6 + rng()*0.5), rng() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // dense speckle for individual moss tufts
+  for (let i = 0; i < 600; i++){
+    const cx = rng() * size, cy = rng() * size;
+    const rad = 0.6 + rng() * 1.6;
+    const bright = rng() > 0.5;
+    const r = bright ? clamp(baseR+45,0,255) : clamp(baseR-30,0,255);
+    const g = bright ? clamp(baseG+55,0,255) : clamp(baseG-30,0,255);
+    const b = bright ? clamp(baseB+30,0,255) : clamp(baseB-20,0,255);
+    ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${0.3 + rng()*0.3})`;
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+  }
+  // sparse bare-soil specks peeking through
+  for (let i = 0; i < 25; i++){
+    const cx = rng() * size, cy = rng() * size;
+    const rad = 1 + rng() * 2.4;
+    ctx.fillStyle = `rgba(36,29,21,${0.35 + rng()*0.3})`;
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(4, 4);
+  if (texture.encoding !== undefined) texture.encoding = THREE.sRGBEncoding;
+  return texture;
+}
+
+/* Grayscale bump map giving the moss layer a dense, nubbly relief */
+function createMossBumpTexture(rng){
+  const size = 180;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgb(120,120,120)';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 500; i++){
+    const cx = rng() * size, cy = rng() * size;
+    const rad = 1 + rng() * 2.6;
+    const v = 90 + rng() * 110;
+    ctx.fillStyle = `rgba(${v|0},${v|0},${v|0},${0.35 + rng()*0.35})`;
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(4, 4);
+  return texture;
+}
+
 function disposeObject(obj){
   obj.traverse(node => {
     if (node.geometry) node.geometry.dispose();
@@ -964,7 +1036,23 @@ function buildPot(seed, speciesName){
   soil.receiveShadow = true;
   group.add(soil);
 
-  // scattered moss / pebbles
+  // textured moss layer covering most of the soil
+  const mossLayerMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: createMossTexture(rng),
+    bumpMap: createMossBumpTexture(rng),
+    bumpScale: 0.06,
+    roughness: 1.0,
+    metalness: 0.0
+  });
+  const mossLayerGeo = new THREE.CylinderGeometry(0.80 * wMult, 0.82 * wMult, 0.02, 32, 1);
+  const mossLayer = new THREE.Mesh(mossLayerGeo, mossLayerMat);
+  mossLayer.position.y = 0.065;
+  mossLayer.castShadow = true;
+  mossLayer.receiveShadow = true;
+  group.add(mossLayer);
+
+  // scattered moss / pebbles, sitting on top of the moss layer
   const mossGeo = new THREE.IcosahedronGeometry(1, 0);
   const mossMat = new THREE.MeshStandardMaterial({ color: 0x445a34, roughness: 1.0, flatShading: true });
   const pebbleMat = new THREE.MeshStandardMaterial({ color: 0x55524a, roughness: 0.9 });
@@ -975,7 +1063,7 @@ function buildPot(seed, speciesName){
     const mesh = new THREE.Mesh(mossGeo, useMoss ? mossMat : pebbleMat);
     const s = useMoss ? (0.05 + rng() * 0.06) : (0.03 + rng() * 0.03);
     mesh.scale.set(s, s * 0.6, s);
-    mesh.position.set(Math.cos(a) * r, 0.055, Math.sin(a) * r);
+    mesh.position.set(Math.cos(a) * r, 0.078, Math.sin(a) * r);
     mesh.rotation.y = rng() * Math.PI;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
