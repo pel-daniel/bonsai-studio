@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>盆栽 · Bonsai Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #eee6d3;
+    --bg-2: #f5efe1;
+    --panel: rgba(255, 253, 246, 0.7);
+    --panel-border: #d8cfb4;
+    --ink: #2c2a20;
+    --ink-muted: #7c7460;
+    --moss: #4c6a3d;
+    --moss-dim: #3b5530;
+    --seal: #a1402d;
+    --seal-dim: #7c2f22;
+  }
+  *{ box-sizing: border-box; }
+  html, body{
+    margin:0; padding:0; width:100%; height:100%;
+    background: radial-gradient(ellipse at 50% 30%, var(--bg-2), var(--bg) 70%);
+    color: var(--ink);
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+  }
+  #canvas-wrap{ position: fixed; inset: 0; }
+  canvas{
+    display:block; width:100%; height:100%; touch-action:none; cursor: grab;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  }
+  canvas:active{ cursor: grabbing; }
+
+  header{
+    position: fixed; top: 28px; left: 32px; z-index: 10;
+    pointer-events: none;
+  }
+  header .kanji{
+    font-family: 'Shippori Mincho', serif;
+    font-size: 15px;
+    letter-spacing: 0.35em;
+    color: var(--moss);
+    margin: 0 0 2px 1px;
+  }
+  header h1{
+    font-family: 'Shippori Mincho', serif;
+    font-weight: 700;
+    font-size: 28px;
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+  header p{
+    margin: 6px 0 0 1px;
+    font-size: 12px;
+    color: var(--ink-muted);
+    letter-spacing: 0.04em;
+  }
+
+  #panel{
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-radius: 14px;
+    padding: 16px 20px 14px;
+    display: flex;
+    align-items: flex-end;
+    gap: 22px;
+    box-shadow: 0 12px 40px rgba(60,50,30,0.16);
+    max-width: 92vw;
+    overflow-x: auto;
+  }
+  .field{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 108px;
+  }
+  .field label{
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--ink-muted);
+    display: flex;
+    justify-content: space-between;
+  }
+  .field label .val{
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--moss);
+    font-size: 10.5px;
+  }
+  select, input[type=range]{
+    accent-color: var(--moss);
+  }
+  select{
+    background: #fbf8ef;
+    color: var(--ink);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 7px 8px;
+    font-family: inherit;
+    font-size: 12.5px;
+    outline: none;
+    width: 100%;
+  }
+  input[type=range]{
+    width: 120px;
+    height: 3px;
+    background: var(--panel-border);
+    border-radius: 4px;
+    -webkit-appearance: none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance: none;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--moss);
+    border: 2px solid #fbf8ef;
+    cursor: pointer;
+  }
+  .divider{
+    width: 1px; align-self: stretch;
+    background: var(--panel-border);
+    margin: 2px 0;
+  }
+  #seal-btn{
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(160deg, var(--seal), var(--seal-dim));
+    color: #f2ded6;
+    font-family: 'Shippori Mincho', serif;
+    font-size: 20px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(161,64,45,0.3), inset 0 0 0 1.5px rgba(255,255,255,0.18);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    flex-shrink: 0;
+    align-self: center;
+  }
+  #seal-btn:hover{ transform: translateY(-2px) scale(1.03); box-shadow: 0 9px 22px rgba(168,63,46,0.45); }
+  #seal-btn:active{ transform: translateY(0px) scale(0.97); }
+  #seal-btn .seal-glyph{ font-size: 20px; line-height: 1; }
+  #seal-btn .seal-label{ display: none; }
+
+  #hint{
+    position: fixed;
+    top: 28px; right: 32px;
+    z-index: 10;
+    font-size: 11px;
+    color: var(--ink-muted);
+    text-align: right;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+  }
+
+  @media (max-width: 720px){
+    #hint{ display:none; }
+  }
+
+  /* Mobile: panel reflows into a centered, wrapping card instead of a scrolling strip */
+  @media (max-width: 640px){
+    header{ top: 18px; left: 18px; }
+    header h1{ font-size: 20px; }
+    header .kanji{ font-size: 12px; letter-spacing: 0.3em; }
+    header p{ font-size: 10.5px; }
+
+    #panel{
+      left: 50%; right: auto; bottom: 16px;
+      transform: translateX(-50%);
+      width: min(94vw, 420px);
+      max-width: 94vw;
+      flex-wrap: wrap;
+      justify-content: center;
+      row-gap: 14px;
+      padding: 16px 16px 14px;
+      overflow-x: visible;
+    }
+    .field{ min-width: 0; flex: 1 1 40%; }
+    input[type=range]{ width: 100%; }
+    .divider{ display: none; }
+    #seal-btn{
+      width: 100%; height: 44px; border-radius: 22px;
+      flex: 1 1 100%;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+    }
+    #seal-btn .seal-label{ display: inline; font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 13px; letter-spacing: 0.05em; }
+  }
+
+  @media (max-width: 380px){
+    .field{ flex: 1 1 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap"><canvas id="c"></canvas></div>
+
+<header>
+  <div class="kanji">盆栽</div>
+  <h1>Bonsai Studio</h1>
+  <p>procedurally grown, one seal at a time</p>
+</header>
+
+<div id="hint">drag to orbit · scroll to zoom</div>
+
+<div id="panel">
+  <div class="field">
+    <label>Species</label>
+    <select id="species">
+      <option value="maple">Maple</option>
+      <option value="pine">Pine</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Style</label>
+    <select id="style">
+      <option value="slant">Slanting</option>
+      <option value="formal">Formal Upright</option>
+      <option value="cascade">Cascade</option>
+      <option value="windswept">Windswept</option>
+      <option value="broom">Broom</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Complexity <span class="val" id="depth-val">5</span></label>
+    <input type="range" id="depth" min="3" max="6" step="1" value="5" />
+  </div>
+  <div class="field">
+    <label>Foliage <span class="val" id="foliage-val">1.0</span></label>
+    <input type="range" id="foliage" min="0.4" max="1.8" step="0.1" value="1.0" />
+  </div>
+  <div class="field">
+    <label>Wildness <span class="val" id="wild-val">0.5</span></label>
+    <input type="range" id="wild" min="0" max="1" step="0.05" value="0.5" />
+  </div>
+  <div class="divider"></div>
+  <button id="seal-btn" title="Grow a new tree">
+    <span class="seal-glyph">新</span><span class="seal-label">Grow new tree</span>
+  </button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ---------------------------------------------------------------------
+   Scene setup
+--------------------------------------------------------------------- */
+const canvas = document.getElementById('c');
+const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.75 : 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+if (renderer.outputEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf1e9d8);
+scene.fog = new THREE.FogExp2(0xf1e9d8, 0.05);
+
+const camera = new THREE.PerspectiveCamera(38, window.innerWidth/window.innerHeight, 0.1, 100);
+
+function resize(){
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Lighting
+scene.add(new THREE.HemisphereLight(0xffffff, 0x5a4a34, 0.75));
+const key = new THREE.DirectionalLight(0xfff2d8, 1.2);
+key.position.set(4.5, 7, 3.5);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = -6; key.shadow.camera.right = 6;
+key.shadow.camera.top = 6; key.shadow.camera.bottom = -6;
+key.shadow.camera.near = 0.5; key.shadow.camera.far = 20;
+key.shadow.bias = -0.0025;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x6c8a5c, 0.35);
+rim.position.set(-5, 3, -4);
+scene.add(rim);
+
+/* ---------------------------------------------------------------------
+   Simple orbit-style camera control (no external deps)
+--------------------------------------------------------------------- */
+const target = new THREE.Vector3(0, 1.0, 0);
+let radius = 6.2, theta = 0.9, phi = 1.15;
+let dragging = false, lastX = 0, lastY = 0;
+let autoRotate = true;
+
+function updateCamera(){
+  const sp = Math.sin(phi), cp = Math.cos(phi);
+  camera.position.set(
+    target.x + radius * sp * Math.sin(theta),
+    target.y + radius * cp,
+    target.z + radius * sp * Math.cos(theta)
+  );
+  camera.lookAt(target);
+}
+updateCamera();
+
+const activePointers = new Map();
+let pinchStartDist = null;
+let pinchStartRadius = radius;
+
+function pinchDistance(){
+  const pts = Array.from(activePointers.values());
+  return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+}
+
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  autoRotate = false;
+  if (activePointers.size === 1){
+    dragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+  } else if (activePointers.size === 2){
+    dragging = false;
+    pinchStartDist = pinchDistance();
+    pinchStartRadius = radius;
+  }
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (activePointers.size === 2){
+    const dist = pinchDistance();
+    if (pinchStartDist){
+      radius = Math.min(Math.max(pinchStartRadius * (pinchStartDist / dist), 3.2), 12);
+      updateCamera();
+    }
+    return;
+  }
+  if (!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+  theta -= dx * 0.006;
+  phi = Math.min(Math.max(phi - dy * 0.006, 0.35), Math.PI - 0.35);
+  updateCamera();
+});
+
+function releasePointer(e){
+  activePointers.delete(e.pointerId);
+  pinchStartDist = null;
+  if (activePointers.size === 1){
+    const remaining = Array.from(activePointers.values())[0];
+    dragging = true;
+    lastX = remaining.x; lastY = remaining.y;
+  } else if (activePointers.size === 0){
+    dragging = false;
+  }
+}
+canvas.addEventListener('pointerup', releasePointer);
+canvas.addEventListener('pointercancel', releasePointer);
+canvas.addEventListener('pointerleave', e => { if (activePointers.has(e.pointerId)) releasePointer(e); });
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  radius = Math.min(Math.max(radius + e.deltaY * 0.0035, 3.2), 12);
+  updateCamera();
+}, { passive: false });
+
+/* ---------------------------------------------------------------------
+   Seeded RNG
+--------------------------------------------------------------------- */
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------------------------------------------------------------------
+   Style parameters
+--------------------------------------------------------------------- */
+const STYLES = {
+  formal:    { branchAngle: 33, angleVar: 10, bias: new THREE.Vector3(0,1,0),          biasStrength: 0.16, cMin:2, cMax:3, lenFall:0.72, radFall:0.70, cascadeStart: 99 },
+  slant:     { branchAngle: 36, angleVar: 13, bias: new THREE.Vector3(0.55,0.85,0.1).normalize(), biasStrength: 0.24, cMin:2, cMax:3, lenFall:0.74, radFall:0.70, cascadeStart: 99, trunkLean: 0.5 },
+  cascade:   { branchAngle: 40, angleVar: 15, bias: new THREE.Vector3(0.25,-1,0.15).normalize(),  biasStrength: 0.34, cMin:2, cMax:3, lenFall:0.78, radFall:0.72, cascadeStart: 2 },
+  windswept: { branchAngle: 32, angleVar: 17, bias: new THREE.Vector3(1,0.12,0.2).normalize(),    biasStrength: 0.42, cMin:2, cMax:3, lenFall:0.73, radFall:0.70, cascadeStart: 99, trunkLean: 0.35 },
+  broom:     { branchAngle: 28, angleVar: 20, bias: new THREE.Vector3(0,1,0),          biasStrength: 0.10, cMin:3, cMax:5, lenFall:0.68, radFall:0.65, cascadeStart: 99, broomAt: 1 }
+};
+
+const FOLIAGE_PALETTES = [
+  [0x5c7a4e, 0x4c6640, 0x74915f],
+  [0x556b3e, 0x475a34, 0x6c7f4a],
+  [0x62785a, 0x516349, 0x7d9271],
+  [0x516e42, 0x435c37, 0x6a8556],
+];
+const POT_COLORS = [0x2b2420, 0x3a2c22, 0x30271f, 0x24211d];
+
+/* ---------------------------------------------------------------------
+   Species parameters — leaf shape, palette, bark, and growth adjustments
+--------------------------------------------------------------------- */
+const SPECIES = {
+  maple: {
+    label: 'Maple',
+    leafGeoFn: () => createMapleLeafGeometry(),
+    palettes: FOLIAGE_PALETTES,
+    barkTrunk: 0x4a3524, barkBranch: 0x6b4f38,
+    bumpScaleTrunk: 0.045, bumpScaleBranch: 0.03,
+    noiseAmt: [0.14, 0.08, 0.04],
+    leaf: { countMin: 5, countRand: 4, scaleMult: 1.0, offsetRadiusMult: 1.0, rotationMode: 'random', textured: true },
+    styleAdj: { radFall: 0, lenFall: 0, angleVar: 0, cMin: 0, cMax: 0 },
+    trunkHeightMult: 1.0, baseRadiusAdj: 0,
+    potHeightMult: 1.0, potWidthMult: 1.0,
+  },
+  pine: {
+    label: 'Pine',
+    leafGeoFn: () => createNeedleGeometry(0.85, 0.085),
+    palettes: [
+      [0x3d5a3a, 0x2f4830, 0x4c6b46],
+      [0x35502e, 0x293f28, 0x44603e],
+      [0x405c3d, 0x324832, 0x517050],
+    ],
+    barkTrunk: 0x4e3f2e, barkBranch: 0x5c4b38,
+    bumpScaleTrunk: 0.09, bumpScaleBranch: 0.065,
+    noiseAmt: [0.24, 0.16, 0.10],
+    leaf: { countMin: 11, countRand: 6, scaleMult: 1.1, offsetRadiusMult: 0.4, rotationMode: 'fan' },
+    styleAdj: { radFall: 0.03, lenFall: 0.02, angleVar: 8, cMin: 0, cMax: -1 },
+    trunkHeightMult: 1.08, baseRadiusAdj: 0.012,
+    potHeightMult: 1.1, potWidthMult: 1.05,
+  },
+};
+
+/* ---------------------------------------------------------------------
+   Tree builder
+--------------------------------------------------------------------- */
+let treeGroup = null;
+
+/* Procedural bark texture (canvas-based), reused as both color map and bump map */
+function createBarkTexture(rng, baseColor){
+  const w = 256, h = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  const base = new THREE.Color(baseColor);
+  ctx.fillStyle = `rgb(${Math.round(base.r*255)}, ${Math.round(base.g*255)}, ${Math.round(base.b*255)})`;
+  ctx.fillRect(0, 0, w, h);
+
+  // vertical fibrous ridges
+  const ridgeCount = 26;
+  for (let i = 0; i < ridgeCount; i++){
+    const x = rng() * w;
+    const shade = (rng() - 0.5) * 46;
+    ctx.strokeStyle = `rgba(${shade > 0 ? 255 : 0},${shade > 0 ? 255 : 0},${shade > 0 ? 255 : 0},${Math.min(0.5, Math.abs(shade)/60)})`;
+    ctx.lineWidth = 1 + rng() * 2.5;
+    ctx.beginPath();
+    let cx = x;
+    ctx.moveTo(cx, 0);
+    for (let y = 0; y <= h; y += 16){
+      cx += (rng() - 0.5) * 10;
+      ctx.lineTo(cx, y);
+    }
+    ctx.stroke();
+  }
+
+  // horizontal bark scars / lenticels
+  for (let i = 0; i < 70; i++){
+    const x = rng() * w, y = rng() * h;
+    const len = 3 + rng() * 10;
+    const dark = rng() > 0.5;
+    ctx.strokeStyle = dark ? `rgba(0,0,0,${0.08 + rng()*0.12})` : `rgba(255,255,255,${0.06 + rng()*0.1})`;
+    ctx.lineWidth = 0.6 + rng() * 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + (rng()-0.5)*len*2, y + len);
+    ctx.stroke();
+  }
+
+  // fine noise speckle for surface grain
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+  for (let i = 0; i < d.length; i += 4){
+    const n = (rng() - 0.5) * 18;
+    d[i] = Math.min(255, Math.max(0, d[i] + n));
+    d[i+1] = Math.min(255, Math.max(0, d[i+1] + n));
+    d[i+2] = Math.min(255, Math.max(0, d[i+2] + n));
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(3, 5);
+  if (texture.encoding !== undefined) texture.encoding = THREE.sRGBEncoding;
+  return texture;
+}
+
+/* Perturb a cylinder's radius per-vertex to give the trunk a gnarled, non-uniform silhouette */
+function addTrunkNoise(geometry, rng, amount){
+  const pos = geometry.attributes.position;
+  const p1 = rng() * Math.PI * 2, p2 = rng() * Math.PI * 2, p3 = rng() * 10;
+  for (let i = 0; i < pos.count; i++){
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const theta = Math.atan2(z, x);
+    const r = Math.sqrt(x*x + z*z);
+    if (r < 1e-5) continue;
+    const factor = 1 + amount * (
+      0.5 * Math.sin(theta * 3 + p1) +
+      0.3 * Math.sin(theta * 7 + p2) +
+      0.25 * Math.sin(y * 4 + p3)
+    );
+    pos.setX(i, x * factor);
+    pos.setZ(i, z * factor);
+  }
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+function disposeObject(obj){
+  obj.traverse(node => {
+    if (node.geometry) node.geometry.dispose();
+    if (node.material){
+      const mats = Array.isArray(node.material) ? node.material : [node.material];
+      mats.forEach(m => {
+        if (m.map) m.map.dispose();
+        if (m.bumpMap && m.bumpMap !== m.map) m.bumpMap.dispose();
+        m.dispose();
+      });
+    }
+  });
+}
+
+function rotateDirection(dir, angleDeg, azimuthRad){
+  const angle = THREE.MathUtils.degToRad(angleDeg);
+  let perp = new THREE.Vector3(1, 0, 0);
+  if (Math.abs(dir.dot(perp)) > 0.9) perp = new THREE.Vector3(0, 0, 1);
+  perp.crossVectors(dir, perp).normalize();
+  perp.applyAxisAngle(dir, azimuthRad);
+  return dir.clone().applyAxisAngle(perp, angle).normalize();
+}
+
+function clamp(v, min, max){ return Math.min(max, Math.max(min, v)); }
+
+/* Maple leaf silhouette control points, base (stem) to tip, right side then mirrored left side */
+const MAPLE_PTS = [
+  [0, -0.30],
+  [0.09, -0.06],
+  [0.36, 0.00],
+  [0.23, 0.17],
+  [0.60, 0.23],
+  [0.37, 0.38],
+  [0.64, 0.60],
+  [0.33, 0.64],
+  [0.17, 0.85],
+  [0.05, 0.76],
+  [0, 1.08],
+  [-0.05, 0.76],
+  [-0.17, 0.85],
+  [-0.33, 0.64],
+  [-0.64, 0.60],
+  [-0.37, 0.38],
+  [-0.60, 0.23],
+  [-0.23, 0.17],
+  [-0.36, 0.00],
+  [-0.09, -0.06],
+];
+
+function computeBBoxFromPts(pts){
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of pts){
+    if (p[0] < minX) minX = p[0];
+    if (p[0] > maxX) maxX = p[0];
+    if (p[1] < minY) minY = p[1];
+    if (p[1] > maxY) maxY = p[1];
+  }
+  return { minX, maxX, minY, maxY };
+}
+const MAPLE_BBOX = computeBBoxFromPts(MAPLE_PTS);
+function maplePointToUV(pt){
+  return [
+    (pt[0] - MAPLE_BBOX.minX) / (MAPLE_BBOX.maxX - MAPLE_BBOX.minX),
+    (pt[1] - MAPLE_BBOX.minY) / (MAPLE_BBOX.maxY - MAPLE_BBOX.minY)
+  ];
+}
+// where the palmate veins converge near the base, and the 7 lobe-tip vertices they radiate to
+const MAPLE_VEIN_HUB = maplePointToUV([
+  (MAPLE_PTS[1][0] + MAPLE_PTS[19][0]) / 2,
+  (MAPLE_PTS[1][1] + MAPLE_PTS[19][1]) / 2
+]);
+const MAPLE_VEIN_TIP_INDICES = [2, 4, 6, 10, 14, 16, 18];
+const MAPLE_VEIN_TIPS = MAPLE_VEIN_TIP_INDICES.map(i => maplePointToUV(MAPLE_PTS[i]));
+const MAPLE_TEX_W = 236, MAPLE_TEX_H = 256;
+
+function uvToCanvas(uv){ return [uv[0] * MAPLE_TEX_W, (1 - uv[1]) * MAPLE_TEX_H]; }
+
+/* Draws a tapered vein from the hub out to a lobe tip, with a few short branch veins along the way */
+function drawVeinPath(ctx, rng, hubXY, tipXY, mainWidth, strokeStyle){
+  const [hx, hy] = hubXY, [tx, ty] = tipXY;
+  const segs = 10;
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineCap = 'round';
+  // slight outward curve so the vein isn't a rigid straight line
+  const bow = (rng() - 0.5) * 10;
+  const midX = (hx + tx) / 2 + bow, midY = (hy + ty) / 2;
+  const pts = [];
+  for (let i = 0; i <= segs; i++){
+    const t = i / segs;
+    const x = (1-t)*(1-t)*hx + 2*(1-t)*t*midX + t*t*tx;
+    const y = (1-t)*(1-t)*hy + 2*(1-t)*t*midY + t*t*ty;
+    pts.push([x, y]);
+  }
+  for (let i = 0; i < segs; i++){
+    const t = i / segs;
+    ctx.lineWidth = mainWidth * (1 - t * 0.82);
+    ctx.beginPath();
+    ctx.moveTo(pts[i][0], pts[i][1]);
+    ctx.lineTo(pts[i+1][0], pts[i+1][1]);
+    ctx.stroke();
+  }
+  // short secondary veins branching toward the margin
+  const branches = 3 + Math.floor(rng() * 3);
+  for (let b = 1; b <= branches; b++){
+    const t = b / (branches + 1);
+    const idx = Math.min(segs - 1, Math.floor(t * segs));
+    const [px, py] = pts[idx];
+    const [nx, ny] = pts[idx+1];
+    const dirx = nx - px, diry = ny - py;
+    const perp = [-diry, dirx];
+    const plen = Math.hypot(perp[0], perp[1]) || 1;
+    const side = rng() > 0.5 ? 1 : -1;
+    const branchLen = (8 + rng() * 10) * (1 - t * 0.4);
+    const ex = px + (perp[0]/plen) * branchLen * side;
+    const ey = py + (perp[1]/plen) * branchLen * side;
+    ctx.lineWidth = mainWidth * 0.32 * (1 - t * 0.3);
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.quadraticCurveTo(px + dirx*0.4, py + diry*0.4, ex, ey);
+    ctx.stroke();
+  }
+}
+
+/* Procedural maple-leaf color texture: mottled blade + palmate veins traced to the actual lobe tips */
+function createMapleLeafTexture(rng, baseColor){
+  const w = MAPLE_TEX_W, h = MAPLE_TEX_H;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  const base = new THREE.Color(baseColor);
+  const br = Math.round(base.r * 255), bg = Math.round(base.g * 255), bb = Math.round(base.b * 255);
+  ctx.fillStyle = `rgb(${br},${bg},${bb})`;
+  ctx.fillRect(0, 0, w, h);
+
+  // uneven light/dark patches across the blade
+  for (let i = 0; i < 90; i++){
+    const cx = rng() * w, cy = rng() * h;
+    const rad = 10 + rng() * 26;
+    const delta = (rng() - 0.5) * 34;
+    const r = clamp(br + delta, 0, 255), g = clamp(bg + delta * 1.05, 0, 255), b = clamp(bb + delta * 0.55, 0, 255);
+    ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${0.16 + rng()*0.16})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rad, rad * (0.5 + rng()*0.5), rng() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // fine speckle grain
+  for (let i = 0; i < 260; i++){
+    const cx = rng() * w, cy = rng() * h;
+    const rad = 0.5 + rng() * 1.4;
+    const dark = rng() > 0.5;
+    const r = dark ? clamp(br-30,0,255) : clamp(br+55,0,255);
+    const g = dark ? clamp(bg-30,0,255) : clamp(bg+55,0,255);
+    const b = dark ? clamp(bb-20,0,255) : clamp(bb+35,0,255);
+    ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${0.18 + rng()*0.2})`;
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // palmate venation, traced from the base hub out to each lobe tip
+  const hubXY = uvToCanvas(MAPLE_VEIN_HUB);
+  const veinColor = `rgba(${clamp(br+60,0,255)|0},${clamp(bg+65,0,255)|0},${clamp(bb+35,0,255)|0},0.55)`;
+  MAPLE_VEIN_TIPS.forEach((tipUV, i) => {
+    const isCenter = i === 3; // apex vein is the most prominent midrib
+    drawVeinPath(ctx, rng, hubXY, uvToCanvas(tipUV), isCenter ? 3.4 : 2.2, veinColor);
+  });
+
+  // subtle darker rim tracing the leaf margin
+  ctx.strokeStyle = `rgba(${clamp(br-35,0,255)|0},${clamp(bg-35,0,255)|0},${clamp(bb-25,0,255)|0},0.25)`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  MAPLE_PTS.forEach((p, i) => {
+    const [cx, cy] = uvToCanvas(maplePointToUV(p));
+    if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+  });
+  ctx.closePath();
+  ctx.stroke();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  if (texture.encoding !== undefined) texture.encoding = THREE.sRGBEncoding;
+  return texture;
+}
+
+/* Grayscale bump map: veins raised slightly above a mottled blade surface, aligned to the same anchors */
+function createMapleLeafBumpTexture(rng){
+  const w = MAPLE_TEX_W, h = MAPLE_TEX_H;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgb(128,128,128)';
+  ctx.fillRect(0, 0, w, h);
+
+  for (let i = 0; i < 130; i++){
+    const cx = rng() * w, cy = rng() * h;
+    const rad = 4 + rng() * 10;
+    const v = 110 + rng() * 45;
+    ctx.fillStyle = `rgba(${v|0},${v|0},${v|0},${0.25 + rng()*0.25})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rad, rad * (0.5 + rng()*0.5), rng() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const hubXY = uvToCanvas(MAPLE_VEIN_HUB);
+  MAPLE_VEIN_TIPS.forEach((tipUV, i) => {
+    const isCenter = i === 3;
+    drawVeinPath(ctx, rng, hubXY, uvToCanvas(tipUV), isCenter ? 3.6 : 2.4, 'rgba(225,225,225,0.85)');
+  });
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
+
+/* A slender, pointed needle/blade shape (spindle profile) — reused for pine (long) and juniper (short, scale-like) */
+function createNeedleGeometry(length, width){
+  const shape = new THREE.Shape();
+  const segments = 10;
+  const halfLen = length / 2;
+  const pts = [];
+  for (let i = 0; i <= segments; i++){
+    const t = i / segments;
+    const y = -halfLen + t * length;
+    const w = (width / 2) * Math.sin(Math.PI * t);
+    pts.push([w, y]);
+  }
+  shape.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i][0], pts[i][1]);
+  for (let i = pts.length - 2; i >= 0; i--) shape.lineTo(-pts[i][0], pts[i][1]);
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape, 1);
+}
+function createMapleLeafGeometry(){
+  const shape = new THREE.Shape();
+  shape.moveTo(MAPLE_PTS[0][0], MAPLE_PTS[0][1]);
+  for (let i = 1; i < MAPLE_PTS.length; i++) shape.lineTo(MAPLE_PTS[i][0], MAPLE_PTS[i][1]);
+  shape.closePath();
+  const geo = new THREE.ShapeGeometry(shape, 1);
+
+  // normalize UV to the shape's own bounding box (default ShapeGeometry UVs are raw,
+  // unnormalized coordinates) so a single non-repeating texture can align features
+  // like veins precisely to the silhouette
+  const uv = geo.attributes.uv;
+  const pos = geo.attributes.position;
+  for (let i = 0; i < uv.count; i++){
+    const [u, v] = maplePointToUV([pos.getX(i), pos.getY(i)]);
+    uv.setXY(i, u, v);
+  }
+  uv.needsUpdate = true;
+
+  geo.translate(0, -0.4, 0);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function buildTree({ seed, styleName, speciesName, maxDepth, foliageMult, wildness }){
+  const rng = mulberry32(seed);
+  const style = STYLES[styleName];
+  const species = SPECIES[speciesName] || SPECIES.maple;
+  const group = new THREE.Group();
+
+  const barkTexTrunk = createBarkTexture(rng, species.barkTrunk);
+  const barkTexBranch = createBarkTexture(rng, species.barkBranch);
+  const barkMatTrunk = new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: barkTexTrunk, bumpMap: barkTexTrunk, bumpScale: species.bumpScaleTrunk,
+    roughness: 0.9, metalness: 0.04
+  });
+  const barkMatBranch = new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: barkTexBranch, bumpMap: barkTexBranch, bumpScale: species.bumpScaleBranch,
+    roughness: 0.85, metalness: 0.04
+  });
+
+  const palette = species.palettes[Math.floor(rng() * species.palettes.length)];
+  const leafCfg = species.leaf;
+  let foliageMats;
+  if (leafCfg.textured){
+    const leafBumpTex = createMapleLeafBumpTexture(rng);
+    foliageMats = palette.map(c => new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: createMapleLeafTexture(rng, c),
+      bumpMap: leafBumpTex,
+      bumpScale: 0.05,
+      roughness: 0.9,
+      metalness: 0.0,
+      side: THREE.DoubleSide
+    }));
+  } else {
+    foliageMats = palette.map(c => new THREE.MeshStandardMaterial({
+      color: c, roughness: 0.88, metalness: 0.0, side: THREE.DoubleSide
+    }));
+  }
+  const foliageGeo = species.leafGeoFn();
+
+  let segmentCount = 0;
+  const MAX_SEGMENTS = isTouchDevice ? 550 : 900;
+
+  function addFoliage(pos, scale, dirHint){
+    const n = Math.max(2, Math.round((leafCfg.countMin + rng() * leafCfg.countRand) * foliageMult));
+    for (let i = 0; i < n; i++){
+      const mat = foliageMats[Math.floor(rng() * foliageMats.length)];
+      const mesh = new THREE.Mesh(foliageGeo, mat);
+      const s = scale * leafCfg.scaleMult * (0.6 + rng() * 0.65);
+
+      if (leafCfg.rotationMode === 'fan' && dirHint){
+        // needles radiate outward from the branch tip in a loose cone, like a pine bundle
+        const azimuth = rng() * Math.PI * 2;
+        const coneAngle = 14 + rng() * 42;
+        const needleDir = rotateDirection(dirHint.clone(), coneAngle, azimuth);
+        mesh.position.copy(pos).add(needleDir.clone().multiplyScalar(scale * 0.6 * leafCfg.offsetRadiusMult));
+        const up = new THREE.Vector3(0, 1, 0);
+        mesh.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, needleDir));
+        mesh.rotateY(rng() * Math.PI * 2);
+        mesh.scale.set(s * (0.85 + rng() * 0.3), s, s * (0.85 + rng() * 0.3));
+      } else {
+        const off = new THREE.Vector3(
+          (rng() - 0.5) * 0.6,
+          (rng() - 0.5) * 0.45 + 0.15,
+          (rng() - 0.5) * 0.6
+        ).multiplyScalar(scale * 1.6 * leafCfg.offsetRadiusMult);
+        mesh.position.copy(pos).add(off);
+        mesh.scale.set(s * (0.85 + rng() * 0.3), s * (0.85 + rng() * 0.3), s);
+        mesh.rotation.set(rng() * Math.PI * 2, rng() * Math.PI * 2, rng() * Math.PI * 2);
+      }
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+  }
+
+  function addSegment(origin, end, radiusBottom, radiusTop, mat, depth){
+    const dir = new THREE.Vector3().subVectors(end, origin);
+    const len = dir.length();
+    if (len < 1e-5) return;
+    const radialSegs = depth <= 1 ? 8 : 6;
+    const heightSegs = depth <= 1 ? 3 : 1;
+    const geo = new THREE.CylinderGeometry(radiusTop, radiusBottom, len, radialSegs, heightSegs);
+    const noiseAmt = species.noiseAmt[Math.min(depth, species.noiseAmt.length - 1)];
+    addTrunkNoise(geo, rng, noiseAmt);
+    const mesh = new THREE.Mesh(geo, mat);
+    const mid = new THREE.Vector3().addVectors(origin, end).multiplyScalar(0.5);
+    mesh.position.copy(mid);
+    const up = new THREE.Vector3(0, 1, 0);
+    const ndir = dir.clone().normalize();
+    const quat = new THREE.Quaternion().setFromUnitVectors(up, ndir);
+    mesh.quaternion.copy(quat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+
+  function grow(origin, dir, length, radius, depth){
+    if (segmentCount > MAX_SEGMENTS) return;
+    segmentCount++;
+
+    // apply style bias toward a preferred growth vector, strengthening with depth
+    let effDir = dir.clone();
+    const isCascading = depth >= style.cascadeStart;
+    const biasVec = isCascading ? style.bias : (depth <= 1 && style.trunkLean
+        ? new THREE.Vector3(style.bias.x * style.trunkLean, 1, style.bias.z * style.trunkLean).normalize()
+        : style.bias);
+    const strength = isCascading ? Math.min(0.85, style.biasStrength + depth * 0.06) : style.biasStrength;
+    effDir.lerp(biasVec, strength * (0.5 + wildness * 0.2)).normalize();
+    // add gentle wobble
+    effDir.x += (rng() - 0.5) * 0.12 * wildness;
+    effDir.z += (rng() - 0.5) * 0.12 * wildness;
+    effDir.normalize();
+
+    const end = origin.clone().add(effDir.clone().multiplyScalar(length));
+    const mat = depth === 0 ? barkMatTrunk : barkMatBranch;
+    addSegment(origin, end, radius, radius * 0.72, mat, depth);
+
+    if (depth >= maxDepth){
+      addFoliage(end, 0.18 + radius * 2.2, effDir);
+      return;
+    }
+
+    const effRadFall = clamp(style.radFall + species.styleAdj.radFall, 0.5, 0.85);
+    const effLenFall = clamp(style.lenFall + species.styleAdj.lenFall, 0.55, 0.85);
+    const effAngleVar = style.angleVar + species.styleAdj.angleVar;
+    const effCMin = Math.max(1, style.cMin + species.styleAdj.cMin);
+    const effCMax = Math.max(effCMin, style.cMax + species.styleAdj.cMax);
+
+    let numChildren = effCMin + Math.floor(rng() * (effCMax - effCMin + 1));
+    if (style.broomAt !== undefined && depth === style.broomAt){
+      numChildren = 5 + Math.floor(rng() * 3);
+    }
+    if (depth === 0) numChildren = Math.max(1, Math.min(2, numChildren)); // keep single-ish trunk continuation
+
+    const baseAngle = style.branchAngle + (rng() - 0.5) * effAngleVar;
+    for (let i = 0; i < numChildren; i++){
+      const azimuth = (i / numChildren) * Math.PI * 2 + rng() * 1.2;
+      const angle = baseAngle * (0.7 + rng() * 0.6) * (depth === 0 ? 0.55 : 1);
+      const newDir = rotateDirection(effDir, angle, azimuth);
+      const newLen = length * (effLenFall + (rng() - 0.5) * 0.12 * wildness);
+      const newRad = radius * (effRadFall + (rng() - 0.5) * 0.08 * wildness);
+      if (newRad < 0.006 || newLen < 0.05) { addFoliage(end, 0.18 + radius * 2.2, effDir); continue; }
+      grow(end, newDir, newLen, newRad, depth + 1);
+    }
+  }
+
+  const trunkHeight = (1.15 + rng() * 0.3) * species.trunkHeightMult;
+  const baseRadius = clamp(0.11 + rng() * 0.025 + species.baseRadiusAdj, 0.06, 0.16);
+  grow(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(0, 1, 0), trunkHeight, baseRadius, 0);
+
+  return group;
+}
+
+/* ---------------------------------------------------------------------
+   Pot + soil
+--------------------------------------------------------------------- */
+function buildPot(seed, speciesName){
+  const rng = mulberry32(seed * 7 + 13);
+  const species = SPECIES[speciesName] || SPECIES.maple;
+  const hMult = species.potHeightMult, wMult = species.potWidthMult;
+  const group = new THREE.Group();
+  const potColor = POT_COLORS[Math.floor(rng() * POT_COLORS.length)];
+  const potMat = new THREE.MeshStandardMaterial({ color: potColor, roughness: 0.45, metalness: 0.12 });
+
+  const potGeo = new THREE.CylinderGeometry(0.95 * wMult, 0.72 * wMult, 0.32 * hMult, 24, 1);
+  const pot = new THREE.Mesh(potGeo, potMat);
+  pot.position.y = -0.16 * hMult;
+  pot.castShadow = true;
+  pot.receiveShadow = true;
+  group.add(pot);
+
+  const lipGeo = new THREE.CylinderGeometry(1.0 * wMult, 0.98 * wMult, 0.06, 24, 1);
+  const lip = new THREE.Mesh(lipGeo, potMat);
+  lip.position.y = 0.005;
+  lip.receiveShadow = true;
+  group.add(lip);
+
+  const soilMat = new THREE.MeshStandardMaterial({ color: 0x241d15, roughness: 1.0 });
+  const soilGeo = new THREE.CylinderGeometry(0.86 * wMult, 0.86 * wMult, 0.05, 24, 1);
+  const soil = new THREE.Mesh(soilGeo, soilMat);
+  soil.position.y = 0.03;
+  soil.receiveShadow = true;
+  group.add(soil);
+
+  // scattered moss / pebbles
+  const mossGeo = new THREE.IcosahedronGeometry(1, 0);
+  const mossMat = new THREE.MeshStandardMaterial({ color: 0x445a34, roughness: 1.0, flatShading: true });
+  const pebbleMat = new THREE.MeshStandardMaterial({ color: 0x55524a, roughness: 0.9 });
+  for (let i = 0; i < 26; i++){
+    const a = rng() * Math.PI * 2;
+    const r = Math.sqrt(rng()) * 0.78 * wMult;
+    const useMoss = rng() > 0.35;
+    const mesh = new THREE.Mesh(mossGeo, useMoss ? mossMat : pebbleMat);
+    const s = useMoss ? (0.05 + rng() * 0.06) : (0.03 + rng() * 0.03);
+    mesh.scale.set(s, s * 0.6, s);
+    mesh.position.set(Math.cos(a) * r, 0.055, Math.sin(a) * r);
+    mesh.rotation.y = rng() * Math.PI;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+
+  // ground shadow-catcher disc
+  const floorGeo = new THREE.CircleGeometry(6, 48);
+  const floorMat = new THREE.ShadowMaterial({ opacity: 0.28 });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.32 * hMult;
+  floor.receiveShadow = true;
+  group.add(floor);
+
+  return group;
+}
+
+let potGroup = null;
+
+/* ---------------------------------------------------------------------
+   Regeneration
+--------------------------------------------------------------------- */
+const ui = {
+  species: document.getElementById('species'),
+  style: document.getElementById('style'),
+  depth: document.getElementById('depth'),
+  depthVal: document.getElementById('depth-val'),
+  foliage: document.getElementById('foliage'),
+  foliageVal: document.getElementById('foliage-val'),
+  wild: document.getElementById('wild'),
+  wildVal: document.getElementById('wild-val'),
+  sealBtn: document.getElementById('seal-btn'),
+};
+
+function currentParams(seed){
+  return {
+    seed,
+    styleName: ui.style.value,
+    speciesName: ui.species.value,
+    maxDepth: parseInt(ui.depth.value, 10),
+    foliageMult: parseFloat(ui.foliage.value),
+    wildness: parseFloat(ui.wild.value),
+  };
+}
+
+function regenerate(newSeed){
+  const seed = newSeed !== undefined ? newSeed : Math.floor(Math.random() * 1e9);
+
+  if (treeGroup){ scene.remove(treeGroup); disposeObject(treeGroup); }
+  if (potGroup){ scene.remove(potGroup); disposeObject(potGroup); }
+
+  treeGroup = buildTree(currentParams(seed));
+  potGroup = buildPot(seed, ui.species.value);
+
+  scene.add(potGroup);
+  scene.add(treeGroup);
+}
+
+ui.species.addEventListener('change', () => regenerate(lastSeed));
+ui.depth.addEventListener('input', () => { ui.depthVal.textContent = ui.depth.value; regenerate(lastSeed); });
+ui.foliage.addEventListener('input', () => { ui.foliageVal.textContent = parseFloat(ui.foliage.value).toFixed(1); regenerate(lastSeed); });
+ui.wild.addEventListener('input', () => { ui.wildVal.textContent = parseFloat(ui.wild.value).toFixed(2); regenerate(lastSeed); });
+ui.style.addEventListener('change', () => regenerate(lastSeed));
+
+let lastSeed = Math.floor(Math.random() * 1e9);
+ui.sealBtn.addEventListener('click', () => {
+  lastSeed = Math.floor(Math.random() * 1e9);
+  regenerate(lastSeed);
+});
+
+regenerate(lastSeed);
+
+/* ---------------------------------------------------------------------
+   Render loop
+--------------------------------------------------------------------- */
+function animate(){
+  requestAnimationFrame(animate);
+  if (autoRotate){ theta += 0.0016; updateCamera(); }
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
