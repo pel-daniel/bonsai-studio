@@ -73,12 +73,52 @@
     border-radius: 14px;
     padding: 16px 20px 14px;
     display: flex;
-    align-items: flex-end;
-    gap: 22px;
+    flex-direction: column;
     box-shadow: 0 12px 40px rgba(60,50,30,0.16);
     max-width: 92vw;
     overflow-x: auto;
   }
+  .panel-row{
+    display: flex;
+    align-items: flex-end;
+    gap: 22px;
+  }
+  #advanced-row{
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    margin-bottom: 0;
+    transition: max-height 0.28s ease, opacity 0.2s ease, margin-bottom 0.28s ease;
+  }
+  #advanced-row.open{
+    max-height: 220px;
+    opacity: 1;
+    margin-bottom: 14px;
+  }
+  .toggle-btn{
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 0 12px;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    color: var(--ink);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .toggle-btn:hover{ background: rgba(0,0,0,0.04); }
+  .toggle-btn .chev{
+    font-size: 9px;
+    display: inline-block;
+    transition: transform 0.2s ease;
+    color: var(--ink-muted);
+  }
+  .toggle-btn.open .chev{ transform: rotate(180deg); }
   .field{
     display: flex;
     flex-direction: column;
@@ -179,15 +219,19 @@
       transform: translateX(-50%);
       width: min(94vw, 420px);
       max-width: 94vw;
-      flex-wrap: wrap;
-      justify-content: center;
-      row-gap: 14px;
       padding: 16px 16px 14px;
       overflow-x: visible;
     }
+    .panel-row{
+      flex-wrap: wrap;
+      justify-content: center;
+      row-gap: 14px;
+    }
+    #advanced-row.open{ max-height: 260px; }
     .field{ min-width: 0; flex: 1 1 40%; }
     input[type=range]{ width: 100%; }
     .divider{ display: none; }
+    .toggle-btn{ flex: 1 1 auto; justify-content: center; }
     #seal-btn{
       width: 100%; height: 44px; border-radius: 22px;
       flex: 1 1 100%;
@@ -214,39 +258,46 @@
 <div id="hint">drag to orbit · scroll to zoom</div>
 
 <div id="panel">
-  <div class="field">
-    <label>Species</label>
-    <select id="species">
-      <option value="maple">Maple</option>
-      <option value="pine">Pine</option>
-    </select>
+  <div class="panel-row" id="advanced-row">
+    <div class="field">
+      <label>Complexity <span class="val" id="depth-val">5</span></label>
+      <input type="range" id="depth" min="3" max="6" step="1" value="5" />
+    </div>
+    <div class="field">
+      <label>Foliage <span class="val" id="foliage-val">1.0</span></label>
+      <input type="range" id="foliage" min="0.4" max="1.8" step="0.1" value="1.0" />
+    </div>
+    <div class="field">
+      <label>Wildness <span class="val" id="wild-val">0.5</span></label>
+      <input type="range" id="wild" min="0" max="1" step="0.05" value="0.5" />
+    </div>
   </div>
-  <div class="field">
-    <label>Style</label>
-    <select id="style">
-      <option value="slant">Slanting</option>
-      <option value="formal">Formal Upright</option>
-      <option value="cascade">Cascade</option>
-      <option value="windswept">Windswept</option>
-      <option value="broom">Broom</option>
-    </select>
+  <div class="panel-row" id="main-row">
+    <div class="field">
+      <label>Species</label>
+      <select id="species">
+        <option value="maple">Maple</option>
+        <option value="pine">Pine</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Style</label>
+      <select id="style">
+        <option value="slant">Slanting</option>
+        <option value="formal">Formal Upright</option>
+        <option value="cascade">Cascade</option>
+        <option value="windswept">Windswept</option>
+        <option value="broom">Broom</option>
+      </select>
+    </div>
+    <button id="adv-toggle" class="toggle-btn" aria-expanded="false" aria-controls="advanced-row">
+      <span>Advanced</span><span class="chev">⌄</span>
+    </button>
+    <div class="divider"></div>
+    <button id="seal-btn" title="Grow a new tree">
+      <span class="seal-glyph">新</span><span class="seal-label">Grow new tree</span>
+    </button>
   </div>
-  <div class="field">
-    <label>Complexity <span class="val" id="depth-val">5</span></label>
-    <input type="range" id="depth" min="3" max="6" step="1" value="5" />
-  </div>
-  <div class="field">
-    <label>Foliage <span class="val" id="foliage-val">1.0</span></label>
-    <input type="range" id="foliage" min="0.4" max="1.8" step="0.1" value="1.0" />
-  </div>
-  <div class="field">
-    <label>Wildness <span class="val" id="wild-val">0.5</span></label>
-    <input type="range" id="wild" min="0" max="1" step="0.05" value="0.5" />
-  </div>
-  <div class="divider"></div>
-  <button id="seal-btn" title="Grow a new tree">
-    <span class="seal-glyph">新</span><span class="seal-label">Grow new tree</span>
-  </button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1190,7 +1241,15 @@ const ui = {
   wild: document.getElementById('wild'),
   wildVal: document.getElementById('wild-val'),
   sealBtn: document.getElementById('seal-btn'),
+  advToggle: document.getElementById('adv-toggle'),
+  advRow: document.getElementById('advanced-row'),
 };
+
+ui.advToggle.addEventListener('click', () => {
+  const isOpen = ui.advRow.classList.toggle('open');
+  ui.advToggle.classList.toggle('open', isOpen);
+  ui.advToggle.setAttribute('aria-expanded', String(isOpen));
+});
 
 function currentParams(seed){
   return {
