@@ -597,6 +597,92 @@ function createMossBumpTexture(rng){
   return texture;
 }
 
+/* Procedural ceramic pot texture: subtle vertical glaze streaks + fine clay grain, tinted to the pot color */
+function createPotTexture(rng, baseColor){
+  const w = 160, h = 200;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  const base = new THREE.Color(baseColor);
+  const br = Math.round(base.r * 255), bg = Math.round(base.g * 255), bb = Math.round(base.b * 255);
+  ctx.fillStyle = `rgb(${br},${bg},${bb})`;
+  ctx.fillRect(0, 0, w, h);
+
+  // vertical glaze streaks, as if the glaze pooled slightly running down the sides
+  for (let i = 0; i < 26; i++){
+    const cx = rng() * w;
+    const streakW = 6 + rng() * 16;
+    const delta = (rng() - 0.5) * 26;
+    const r = clamp(br + delta, 0, 255), g = clamp(bg + delta, 0, 255), b = clamp(bb + delta, 0, 255);
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, `rgba(${r|0},${g|0},${b|0},${0.05 + rng()*0.08})`);
+    grad.addColorStop(1, `rgba(${r|0},${g|0},${b|0},${0.18 + rng()*0.16})`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(cx, h * 0.5, streakW, h * 0.75, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // fine clay-grain speckle
+  for (let i = 0; i < 280; i++){
+    const cx = rng() * w, cy = rng() * h;
+    const rad = 0.5 + rng() * 1.3;
+    const dark = rng() > 0.5;
+    const delta = dark ? -(18 + rng()*14) : (14 + rng()*14);
+    const r = clamp(br + delta, 0, 255), g = clamp(bg + delta, 0, 255), b = clamp(bb + delta, 0, 255);
+    ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${0.18 + rng()*0.2})`;
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(3, 1);
+  if (texture.encoding !== undefined) texture.encoding = THREE.sRGBEncoding;
+  return texture;
+}
+
+/* Grayscale bump map giving the pot glaze subtle orange-peel texture and hairline crackle */
+function createPotBumpTexture(rng){
+  const w = 160, h = 200;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgb(128,128,128)';
+  ctx.fillRect(0, 0, w, h);
+
+  // orange-peel micro bumps
+  for (let i = 0; i < 220; i++){
+    const cx = rng() * w, cy = rng() * h;
+    const rad = 1 + rng() * 2.6;
+    const v = 110 + rng() * 40;
+    ctx.fillStyle = `rgba(${v|0},${v|0},${v|0},${0.25 + rng()*0.25})`;
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+  }
+  // faint crackle-glaze hairlines
+  for (let i = 0; i < 10; i++){
+    ctx.strokeStyle = `rgba(90,90,90,${0.15 + rng()*0.15})`;
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    let x = rng() * w, y = rng() * h;
+    ctx.moveTo(x, y);
+    const segs = 4 + Math.floor(rng() * 4);
+    for (let s = 0; s < segs; s++){
+      x += (rng() - 0.5) * 40;
+      y += (rng() - 0.5) * 40;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(3, 1);
+  return texture;
+}
+
 function disposeObject(obj){
   obj.traverse(node => {
     if (node.geometry) node.geometry.dispose();
@@ -1014,7 +1100,14 @@ function buildPot(seed, speciesName){
   const hMult = species.potHeightMult, wMult = species.potWidthMult;
   const group = new THREE.Group();
   const potColor = POT_COLORS[Math.floor(rng() * POT_COLORS.length)];
-  const potMat = new THREE.MeshStandardMaterial({ color: potColor, roughness: 0.45, metalness: 0.12 });
+  const potMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: createPotTexture(rng, potColor),
+    bumpMap: createPotBumpTexture(rng),
+    bumpScale: 0.018,
+    roughness: 0.45,
+    metalness: 0.12
+  });
 
   const potGeo = new THREE.CylinderGeometry(0.95 * wMult, 0.72 * wMult, 0.32 * hMult, 24, 1);
   const pot = new THREE.Mesh(potGeo, potMat);
