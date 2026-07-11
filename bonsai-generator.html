@@ -361,6 +361,21 @@ function updateCamera(){
 }
 updateCamera();
 
+/* Frames the camera so the whole tree + pot fits in view, based on their combined bounding box */
+function fitCameraToScene(){
+  if (!treeGroup || !potGroup) return;
+  const box = new THREE.Box3().setFromObject(treeGroup);
+  box.expandByObject(potGroup);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z, 0.5);
+  const fov = THREE.MathUtils.degToRad(camera.fov);
+  const fitRadius = (maxDim / 2) / Math.tan(fov / 2);
+  target.copy(center);
+  radius = clamp(fitRadius * 1.55, 3.2, 18);
+  updateCamera();
+}
+
 const activePointers = new Map();
 let pinchStartDist = null;
 let pinchStartRadius = radius;
@@ -1262,7 +1277,7 @@ function currentParams(seed){
   };
 }
 
-function regenerate(newSeed){
+function regenerate(newSeed, shouldFit){
   const seed = newSeed !== undefined ? newSeed : Math.floor(Math.random() * 1e9);
 
   if (treeGroup){ scene.remove(treeGroup); disposeObject(treeGroup); }
@@ -1273,13 +1288,15 @@ function regenerate(newSeed){
 
   scene.add(potGroup);
   scene.add(treeGroup);
+
+  if (shouldFit) fitCameraToScene();
 }
 
-ui.species.addEventListener('change', () => regenerate(lastSeed));
+ui.species.addEventListener('change', () => regenerate(lastSeed, true));
 ui.depth.addEventListener('input', () => { ui.depthVal.textContent = ui.depth.value; regenerate(lastSeed); });
 ui.foliage.addEventListener('input', () => { ui.foliageVal.textContent = parseFloat(ui.foliage.value).toFixed(1); regenerate(lastSeed); });
 ui.wild.addEventListener('input', () => { ui.wildVal.textContent = parseFloat(ui.wild.value).toFixed(2); regenerate(lastSeed); });
-ui.style.addEventListener('change', () => regenerate(lastSeed));
+ui.style.addEventListener('change', () => regenerate(lastSeed, true));
 
 let lastSeed = Math.floor(Math.random() * 1e9);
 ui.sealBtn.addEventListener('click', () => {
@@ -1287,7 +1304,7 @@ ui.sealBtn.addEventListener('click', () => {
   regenerate(lastSeed);
 });
 
-regenerate(lastSeed);
+regenerate(lastSeed, true);
 
 /* ---------------------------------------------------------------------
    Render loop
