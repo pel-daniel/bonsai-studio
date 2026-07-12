@@ -714,6 +714,25 @@ function addTrunkNoise(geometry, rng, amount){
   geometry.computeVertexNormals();
 }
 
+/* Bows a straight cylinder segment into a gentle curve. The offset is zero at both ends
+   (t=0 and t=1) so neighboring segments still join seamlessly, and scales with wildness. */
+function bendSegmentGeometry(geometry, len, rng, wildness){
+  const pos = geometry.attributes.position;
+  const bendAngle = rng() * Math.PI * 2;
+  const bendDirX = Math.cos(bendAngle), bendDirZ = Math.sin(bendAngle);
+  const bendAmount = len * (0.06 + wildness * 0.22) * (0.5 + rng() * 0.7);
+  const halfLen = len / 2;
+  for (let i = 0; i < pos.count; i++){
+    const y = pos.getY(i);
+    const t = clamp((y + halfLen) / len, 0, 1);
+    const bow = Math.sin(Math.PI * t) * bendAmount;
+    pos.setX(i, pos.getX(i) + bendDirX * bow);
+    pos.setZ(i, pos.getZ(i) + bendDirZ * bow);
+  }
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
 /* Procedural moss ground-cover texture: mottled green tufts with sparse bare-soil specks */
 function createMossTexture(rng, tint){
   const size = 180;
@@ -1484,10 +1503,11 @@ function buildTree({ seed, styleName, speciesName, seasonName, maxDepth, foliage
     const len = dir.length();
     if (len < 1e-5) return;
     const radialSegs = depth <= 1 ? 8 : 6;
-    const heightSegs = depth <= 1 ? 3 : 1;
+    const heightSegs = depth <= 1 ? 4 : 3;
     const geo = new THREE.CylinderGeometry(radiusTop, radiusBottom, len, radialSegs, heightSegs);
     const noiseAmt = species.noiseAmt[Math.min(depth, species.noiseAmt.length - 1)];
     addTrunkNoise(geo, rng, noiseAmt);
+    bendSegmentGeometry(geo, len, rng, wildness);
     const mesh = new THREE.Mesh(geo, mat);
     const mid = new THREE.Vector3().addVectors(origin, end).multiplyScalar(0.5);
     mesh.position.copy(mid);
