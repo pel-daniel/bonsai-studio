@@ -279,6 +279,7 @@
         <option value="maple">Maple</option>
         <option value="pine">Pine</option>
         <option value="cherry">Cherry</option>
+        <option value="oak">Oak</option>
       </select>
     </div>
     <div class="field">
@@ -528,6 +529,22 @@ const SPECIES = {
     trunkHeightMult: 0.95, baseRadiusAdj: 0,
     potHeightMult: 1.0, potWidthMult: 1.0,
   },
+  oak: {
+    label: 'Oak',
+    leafGeoFn: () => createOakLeafGeometry(),
+    palettes: [
+      [0x4b6b3a, 0x3c5830, 0x5d7a48],
+      [0x445c34, 0x374b2b, 0x536b40],
+      [0x516b3f, 0x435930, 0x64794f],
+    ],
+    barkTrunk: 0x4b433a, barkBranch: 0x5c534a,
+    bumpScaleTrunk: 0.11, bumpScaleBranch: 0.08,
+    noiseAmt: [0.22, 0.14, 0.08],
+    leaf: { countMin: 6, countRand: 5, scaleMult: 1.15, offsetRadiusMult: 1.0, rotationMode: 'random', textured: true },
+    styleAdj: { radFall: 0.04, lenFall: -0.02, angleVar: 4, cMin: 0, cMax: 0 },
+    trunkHeightMult: 0.92, baseRadiusAdj: 0.018,
+    potHeightMult: 1.05, potWidthMult: 1.08,
+  },
 };
 
 /* ---------------------------------------------------------------------
@@ -547,9 +564,13 @@ const SEASONS = {
         [0xf6cfe0, 0xf0a9c8, 0xffe4ef],
         [0xf5c3d8, 0xe98fb8, 0xfbdcea],
       ],
+      oak: [
+        [0x9ec96a, 0x86b350, 0xb0d67e],
+        [0x93bf5e, 0x7ba846, 0xa6cd72],
+      ],
     },
     speciesTint: { pine: 16 },
-    leafDensityMult: { maple: 0.8, pine: 1.0, cherry: 1.3 },
+    leafDensityMult: { maple: 0.8, pine: 1.0, cherry: 1.3, oak: 0.85 },
     mossTint: { r: 16, g: 20, b: 4 },
     snow: false,
   },
@@ -561,7 +582,7 @@ const SEASONS = {
       ],
     },
     speciesTint: {},
-    leafDensityMult: { maple: 1.0, pine: 1.0, cherry: 0.9 },
+    leafDensityMult: { maple: 1.0, pine: 1.0, cherry: 0.9, oak: 1.0 },
     mossTint: { r: 0, g: 0, b: 0 },
     snow: false,
   },
@@ -576,9 +597,13 @@ const SEASONS = {
       cherry: [
         [0xd9a03a, 0xc47a1f, 0xefc85a],
       ],
+      oak: [
+        [0x8a4a2a, 0x6b3520, 0xa8622f],
+        [0x764028, 0x5a2f1c, 0x8f4f2a],
+      ],
     },
     speciesTint: { pine: -12 },
-    leafDensityMult: { maple: 1.0, pine: 1.0, cherry: 0.85 },
+    leafDensityMult: { maple: 1.0, pine: 1.0, cherry: 0.85, oak: 1.0 },
     mossTint: { r: 12, g: -6, b: -16 },
     snow: false,
   },
@@ -591,9 +616,12 @@ const SEASONS = {
       cherry: [
         [0x6b5a44, 0x59492f, 0x7c6a50],
       ],
+      oak: [
+        [0x6e5c42, 0x5a4a34, 0x806b4e],
+      ],
     },
     speciesTint: { pine: -22 },
-    leafDensityMult: { maple: 0.06, pine: 1.0, cherry: 0.05 },
+    leafDensityMult: { maple: 0.06, pine: 1.0, cherry: 0.05, oak: 0.15 },
     mossTint: { r: -16, g: -12, b: -6 },
     snow: true,
   },
@@ -1211,6 +1239,110 @@ function createBlossomBumpTexture(rng){
   texture.wrapT = THREE.ClampToEdgeWrapping;
   return texture;
 }
+
+/* Oak leaf: rounded, undulating lobes (not pointed like maple), sampled from a tapering envelope */
+function createOakLeafGeometry(){
+  const height = 1.3, maxWidth = 0.62, lobes = 9, lobeDepth = 0.32, segments = 48;
+  const rightPts = [];
+  for (let i = 0; i <= segments; i++){
+    const t = i / segments;
+    const y = t * height;
+    const envelope = Math.sin(Math.PI * t);
+    const lobeFactor = 1 - lobeDepth + lobeDepth * Math.abs(Math.cos(lobes * Math.PI * t));
+    rightPts.push([maxWidth * envelope * lobeFactor, y]);
+  }
+  const shape = new THREE.Shape();
+  shape.moveTo(rightPts[0][0], rightPts[0][1]);
+  for (let i = 1; i < rightPts.length; i++) shape.lineTo(rightPts[i][0], rightPts[i][1]);
+  for (let i = rightPts.length - 2; i >= 0; i--) shape.lineTo(-rightPts[i][0], rightPts[i][1]);
+  shape.closePath();
+  const geo = new THREE.ShapeGeometry(shape, 1);
+
+  const uv = geo.attributes.uv;
+  const pos = geo.attributes.position;
+  for (let i = 0; i < uv.count; i++){
+    uv.setXY(i, (pos.getX(i) + maxWidth) / (2 * maxWidth), pos.getY(i) / height);
+  }
+  uv.needsUpdate = true;
+  geo.translate(0, -height * 0.45, 0);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+const OAK_TEX_W = 220, OAK_TEX_H = 232;
+const OAK_MIDRIB_BASE_UV = [0.5, 0.0];
+const OAK_MIDRIB_TIP_UV = [0.5, 1.0];
+
+/* Procedural oak leaf texture: mottled matte green + a single pinnate midrib (drawVeinPath's
+   automatic side-branches double as the lobe veins) */
+function createOakLeafTexture(rng, baseColor){
+  const w = OAK_TEX_W, h = OAK_TEX_H;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  const base = new THREE.Color(baseColor);
+  const br = Math.round(base.r * 255), bg = Math.round(base.g * 255), bb = Math.round(base.b * 255);
+  ctx.fillStyle = `rgb(${br},${bg},${bb})`;
+  ctx.fillRect(0, 0, w, h);
+
+  for (let i = 0; i < 80; i++){
+    const cx = rng() * w, cy = rng() * h;
+    const rad = 9 + rng() * 22;
+    const delta = (rng() - 0.5) * 28;
+    const r = clamp(br + delta, 0, 255), g = clamp(bg + delta, 0, 255), b = clamp(bb + delta * 0.7, 0, 255);
+    ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${0.15 + rng()*0.15})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rad, rad * (0.55 + rng()*0.45), rng() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (let i = 0; i < 220; i++){
+    const cx = rng() * w, cy = rng() * h;
+    const rad = 0.5 + rng() * 1.3;
+    const dark = rng() > 0.5;
+    const r = dark ? clamp(br-28,0,255) : clamp(br+42,0,255);
+    const g = dark ? clamp(bg-28,0,255) : clamp(bg+42,0,255);
+    const b = dark ? clamp(bb-20,0,255) : clamp(bb+30,0,255);
+    ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${0.16 + rng()*0.18})`;
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+  }
+
+  const veinColor = `rgba(${clamp(br+50,0,255)|0},${clamp(bg+50,0,255)|0},${clamp(bb+30,0,255)|0},0.5)`;
+  drawVeinPath(ctx, rng, uvToCanvas(OAK_MIDRIB_BASE_UV, w, h), uvToCanvas(OAK_MIDRIB_TIP_UV, w, h), 3.0, veinColor);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  if (texture.encoding !== undefined) texture.encoding = THREE.sRGBEncoding;
+  return texture;
+}
+
+/* Grayscale bump map for the oak leaf, matching midrib placement */
+function createOakLeafBumpTexture(rng){
+  const w = OAK_TEX_W, h = OAK_TEX_H;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgb(128,128,128)';
+  ctx.fillRect(0, 0, w, h);
+
+  for (let i = 0; i < 120; i++){
+    const cx = rng() * w, cy = rng() * h;
+    const rad = 4 + rng() * 9;
+    const v = 108 + rng() * 45;
+    ctx.fillStyle = `rgba(${v|0},${v|0},${v|0},${0.22 + rng()*0.24})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rad, rad * (0.55 + rng()*0.45), rng() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  drawVeinPath(ctx, rng, uvToCanvas(OAK_MIDRIB_BASE_UV, w, h), uvToCanvas(OAK_MIDRIB_TIP_UV, w, h), 3.4, 'rgba(222,222,222,0.8)');
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
 function createMapleLeafGeometry(){
   const shape = new THREE.Shape();
   shape.moveTo(MAPLE_PTS[0][0], MAPLE_PTS[0][1]);
@@ -1275,6 +1407,17 @@ function buildTree({ seed, styleName, speciesName, seasonName, maxDepth, foliage
         bumpMap: blossomBumpTex,
         bumpScale: 0.04,
         roughness: 0.88,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+      }));
+    } else if (speciesName === 'oak'){
+      const oakBumpTex = createOakLeafBumpTexture(rng);
+      foliageMats = palette.map(c => new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        map: createOakLeafTexture(rng, c),
+        bumpMap: oakBumpTex,
+        bumpScale: 0.055,
+        roughness: 0.9,
         metalness: 0.0,
         side: THREE.DoubleSide
       }));
