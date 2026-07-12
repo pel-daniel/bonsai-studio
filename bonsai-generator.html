@@ -278,6 +278,7 @@
       <select id="species">
         <option value="maple">Maple</option>
         <option value="pine">Pine</option>
+        <option value="cherry">Cherry</option>
       </select>
     </div>
     <div class="field">
@@ -512,6 +513,21 @@ const SPECIES = {
     trunkHeightMult: 1.08, baseRadiusAdj: 0.012,
     potHeightMult: 1.1, potWidthMult: 1.05,
   },
+  cherry: {
+    label: 'Cherry',
+    leafGeoFn: () => createBlossomGeometry(),
+    palettes: [
+      [0xf6cfe0, 0xf0a9c8, 0xffe4ef],
+      [0xf5c3d8, 0xe98fb8, 0xfbdcea],
+    ],
+    barkTrunk: 0x6b5445, barkBranch: 0x7c6352,
+    bumpScaleTrunk: 0.02, bumpScaleBranch: 0.015,
+    noiseAmt: [0.10, 0.06, 0.03],
+    leaf: { countMin: 7, countRand: 5, scaleMult: 0.85, offsetRadiusMult: 1.0, rotationMode: 'random' },
+    styleAdj: { radFall: 0, lenFall: 0, angleVar: 2, cMin: 0, cMax: 1 },
+    trunkHeightMult: 0.95, baseRadiusAdj: 0,
+    potHeightMult: 1.0, potWidthMult: 1.0,
+  },
 };
 
 /* ---------------------------------------------------------------------
@@ -521,43 +537,63 @@ const SPECIES = {
 const SEASONS = {
   spring: {
     label: 'Spring',
-    maplePalettes: [
-      [0x9fcf6a, 0x86ba52, 0xb3da84],
-      [0x8fc25e, 0x76ac48, 0xa5d074],
-      [0xa6d472, 0x8dbd57, 0xbadf8c],
-    ],
-    pineTint: 16,
-    leafDensityMult: { maple: 0.8, pine: 1.0 },
+    speciesPalettes: {
+      maple: [
+        [0x9fcf6a, 0x86ba52, 0xb3da84],
+        [0x8fc25e, 0x76ac48, 0xa5d074],
+        [0xa6d472, 0x8dbd57, 0xbadf8c],
+      ],
+      cherry: [
+        [0xf6cfe0, 0xf0a9c8, 0xffe4ef],
+        [0xf5c3d8, 0xe98fb8, 0xfbdcea],
+      ],
+    },
+    speciesTint: { pine: 16 },
+    leafDensityMult: { maple: 0.8, pine: 1.0, cherry: 1.3 },
     mossTint: { r: 16, g: 20, b: 4 },
     snow: false,
   },
   summer: {
     label: 'Summer',
-    maplePalettes: null,
-    pineTint: 0,
-    leafDensityMult: { maple: 1.0, pine: 1.0 },
+    speciesPalettes: {
+      cherry: [
+        [0x5a7a48, 0x4a6838, 0x6c8c58],
+      ],
+    },
+    speciesTint: {},
+    leafDensityMult: { maple: 1.0, pine: 1.0, cherry: 0.9 },
     mossTint: { r: 0, g: 0, b: 0 },
     snow: false,
   },
   autumn: {
     label: 'Autumn',
-    maplePalettes: [
-      [0xd9762a, 0xb84a1f, 0xefa93a],
-      [0xc0431f, 0x8f2f18, 0xe08a2e],
-      [0xe0932f, 0xa8531e, 0xf2c04a],
-    ],
-    pineTint: -12,
-    leafDensityMult: { maple: 1.0, pine: 1.0 },
+    speciesPalettes: {
+      maple: [
+        [0xd9762a, 0xb84a1f, 0xefa93a],
+        [0xc0431f, 0x8f2f18, 0xe08a2e],
+        [0xe0932f, 0xa8531e, 0xf2c04a],
+      ],
+      cherry: [
+        [0xd9a03a, 0xc47a1f, 0xefc85a],
+      ],
+    },
+    speciesTint: { pine: -12 },
+    leafDensityMult: { maple: 1.0, pine: 1.0, cherry: 0.85 },
     mossTint: { r: 12, g: -6, b: -16 },
     snow: false,
   },
   winter: {
     label: 'Winter',
-    maplePalettes: [
-      [0x6b5a44, 0x59492f, 0x7c6a50],
-    ],
-    pineTint: -22,
-    leafDensityMult: { maple: 0.06, pine: 1.0 },
+    speciesPalettes: {
+      maple: [
+        [0x6b5a44, 0x59492f, 0x7c6a50],
+      ],
+      cherry: [
+        [0x6b5a44, 0x59492f, 0x7c6a50],
+      ],
+    },
+    speciesTint: { pine: -22 },
+    leafDensityMult: { maple: 0.06, pine: 1.0, cherry: 0.05 },
     mossTint: { r: -16, g: -12, b: -6 },
     snow: true,
   },
@@ -1050,6 +1086,34 @@ function createNeedleGeometry(length, width){
   shape.closePath();
   return new THREE.ShapeGeometry(shape, 1);
 }
+
+/* A small 5-petal blossom silhouette (also stands in for simple foliage clumps out of bloom season) */
+function createBlossomGeometry(){
+  const petals = 5;
+  const innerR = 0.16, outerR = 0.5;
+  const segs = 60;
+  const shape = new THREE.Shape();
+  for (let i = 0; i <= segs; i++){
+    const t = i / segs;
+    const theta = t * Math.PI * 2;
+    const wave = Math.pow(0.5 + 0.5 * Math.cos(petals * theta), 1.15);
+    const r = innerR + (outerR - innerR) * wave;
+    const x = Math.cos(theta) * r, y = Math.sin(theta) * r;
+    if (i === 0) shape.moveTo(x, y); else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  const geo = new THREE.ShapeGeometry(shape, 1);
+
+  // normalize UV to the flower's own bounding square, same reasoning as the maple leaf
+  const uv = geo.attributes.uv;
+  const pos = geo.attributes.position;
+  for (let i = 0; i < uv.count; i++){
+    uv.setXY(i, (pos.getX(i) + outerR) / (2 * outerR), (pos.getY(i) + outerR) / (2 * outerR));
+  }
+  uv.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
+}
 function createMapleLeafGeometry(){
   const shape = new THREE.Shape();
   shape.moveTo(MAPLE_PTS[0][0], MAPLE_PTS[0][1]);
@@ -1092,12 +1156,14 @@ function buildTree({ seed, styleName, speciesName, seasonName, maxDepth, foliage
   });
 
   let palette;
-  if (speciesName === 'maple' && season.maplePalettes){
-    palette = season.maplePalettes[Math.floor(rng() * season.maplePalettes.length)];
+  const seasonPalettes = season.speciesPalettes && season.speciesPalettes[speciesName];
+  if (seasonPalettes){
+    palette = seasonPalettes[Math.floor(rng() * seasonPalettes.length)];
   } else {
     palette = species.palettes[Math.floor(rng() * species.palettes.length)];
-    if (speciesName === 'pine' && season.pineTint){
-      palette = palette.map(c => tintColor(c, { r: season.pineTint, g: season.pineTint, b: season.pineTint }));
+    const tint = season.speciesTint && season.speciesTint[speciesName];
+    if (tint){
+      palette = palette.map(c => tintColor(c, { r: tint, g: tint, b: tint }));
     }
   }
   const seasonDensityMult = (season.leafDensityMult && season.leafDensityMult[speciesName]) ?? 1.0;
