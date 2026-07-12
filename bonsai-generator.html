@@ -290,6 +290,15 @@
         <option value="broom">Broom</option>
       </select>
     </div>
+    <div class="field">
+      <label>Season</label>
+      <select id="season">
+        <option value="spring">Spring</option>
+        <option value="summer" selected>Summer</option>
+        <option value="autumn">Autumn</option>
+        <option value="winter">Winter</option>
+      </select>
+    </div>
     <button id="adv-toggle" class="toggle-btn" aria-expanded="false" aria-controls="advanced-row">
       <span>Advanced</span><span class="chev">⌄</span>
     </button>
@@ -506,6 +515,56 @@ const SPECIES = {
 };
 
 /* ---------------------------------------------------------------------
+   Season parameters — foliage palette overrides, leaf density, and
+   ground/snow treatment. Summer is the species' natural baseline.
+--------------------------------------------------------------------- */
+const SEASONS = {
+  spring: {
+    label: 'Spring',
+    maplePalettes: [
+      [0x9fcf6a, 0x86ba52, 0xb3da84],
+      [0x8fc25e, 0x76ac48, 0xa5d074],
+      [0xa6d472, 0x8dbd57, 0xbadf8c],
+    ],
+    pineTint: 16,
+    leafDensityMult: { maple: 0.8, pine: 1.0 },
+    mossTint: { r: 16, g: 20, b: 4 },
+    snow: false,
+  },
+  summer: {
+    label: 'Summer',
+    maplePalettes: null,
+    pineTint: 0,
+    leafDensityMult: { maple: 1.0, pine: 1.0 },
+    mossTint: { r: 0, g: 0, b: 0 },
+    snow: false,
+  },
+  autumn: {
+    label: 'Autumn',
+    maplePalettes: [
+      [0xd9762a, 0xb84a1f, 0xefa93a],
+      [0xc0431f, 0x8f2f18, 0xe08a2e],
+      [0xe0932f, 0xa8531e, 0xf2c04a],
+    ],
+    pineTint: -12,
+    leafDensityMult: { maple: 1.0, pine: 1.0 },
+    mossTint: { r: 12, g: -6, b: -16 },
+    snow: false,
+  },
+  winter: {
+    label: 'Winter',
+    maplePalettes: [
+      [0x6b5a44, 0x59492f, 0x7c6a50],
+    ],
+    pineTint: -22,
+    leafDensityMult: { maple: 0.06, pine: 1.0 },
+    mossTint: { r: -16, g: -12, b: -6 },
+    snow: true,
+  },
+};
+
+
+/* ---------------------------------------------------------------------
    Tree builder
 --------------------------------------------------------------------- */
 let treeGroup = null;
@@ -592,14 +651,15 @@ function addTrunkNoise(geometry, rng, amount){
 }
 
 /* Procedural moss ground-cover texture: mottled green tufts with sparse bare-soil specks */
-function createMossTexture(rng){
+function createMossTexture(rng, tint){
   const size = 180;
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
+  const t = tint || { r: 0, g: 0, b: 0 };
 
   const hueShift = (rng() - 0.5) * 14;
-  const baseR = clamp(58 + hueShift, 0, 255), baseG = clamp(84 + hueShift * 1.1, 0, 255), baseB = clamp(50 + hueShift * 0.6, 0, 255);
+  const baseR = clamp(58 + hueShift + t.r, 0, 255), baseG = clamp(84 + hueShift * 1.1 + t.g, 0, 255), baseB = clamp(50 + hueShift * 0.6 + t.b, 0, 255);
   ctx.fillStyle = `rgb(${baseR|0},${baseG|0},${baseB|0})`;
   ctx.fillRect(0, 0, size, size);
 
@@ -773,6 +833,14 @@ function rotateDirection(dir, angleDeg, azimuthRad){
 }
 
 function clamp(v, min, max){ return Math.min(max, Math.max(min, v)); }
+
+function tintColor(hex, delta){
+  const c = new THREE.Color(hex);
+  const r = clamp(Math.round(c.r * 255) + (delta.r || 0), 0, 255);
+  const g = clamp(Math.round(c.g * 255) + (delta.g || 0), 0, 255);
+  const b = clamp(Math.round(c.b * 255) + (delta.b || 0), 0, 255);
+  return (r << 16) | (g << 8) | b;
+}
 
 /* Maple leaf silhouette control points, base (stem) to tip, right side then mirrored left side */
 const MAPLE_PTS = [
@@ -1005,10 +1073,11 @@ function createMapleLeafGeometry(){
   return geo;
 }
 
-function buildTree({ seed, styleName, speciesName, maxDepth, foliageMult, wildness }){
+function buildTree({ seed, styleName, speciesName, seasonName, maxDepth, foliageMult, wildness }){
   const rng = mulberry32(seed);
   const style = STYLES[styleName];
   const species = SPECIES[speciesName] || SPECIES.maple;
+  const season = SEASONS[seasonName] || SEASONS.summer;
   const group = new THREE.Group();
 
   const barkTexTrunk = createBarkTexture(rng, species.barkTrunk);
@@ -1022,7 +1091,16 @@ function buildTree({ seed, styleName, speciesName, maxDepth, foliageMult, wildne
     roughness: 0.85, metalness: 0.04
   });
 
-  const palette = species.palettes[Math.floor(rng() * species.palettes.length)];
+  let palette;
+  if (speciesName === 'maple' && season.maplePalettes){
+    palette = season.maplePalettes[Math.floor(rng() * season.maplePalettes.length)];
+  } else {
+    palette = species.palettes[Math.floor(rng() * species.palettes.length)];
+    if (speciesName === 'pine' && season.pineTint){
+      palette = palette.map(c => tintColor(c, { r: season.pineTint, g: season.pineTint, b: season.pineTint }));
+    }
+  }
+  const seasonDensityMult = (season.leafDensityMult && season.leafDensityMult[speciesName]) ?? 1.0;
   const leafCfg = species.leaf;
   let foliageMats;
   if (leafCfg.textured){
@@ -1043,11 +1121,14 @@ function buildTree({ seed, styleName, speciesName, maxDepth, foliageMult, wildne
   }
   const foliageGeo = species.leafGeoFn();
 
+  const snowMat = new THREE.MeshStandardMaterial({ color: 0xf2f5f0, roughness: 0.85, metalness: 0.0 });
+  const snowGeo = new THREE.IcosahedronGeometry(1, 0);
+
   let segmentCount = 0;
   const MAX_SEGMENTS = isTouchDevice ? 550 : 900;
 
   function addFoliage(pos, scale, dirHint){
-    const n = Math.max(2, Math.round((leafCfg.countMin + rng() * leafCfg.countRand) * foliageMult));
+    const n = Math.max(2, Math.round((leafCfg.countMin + rng() * leafCfg.countRand) * foliageMult * seasonDensityMult));
     for (let i = 0; i < n; i++){
       const mat = foliageMats[Math.floor(rng() * foliageMats.length)];
       const mesh = new THREE.Mesh(foliageGeo, mat);
@@ -1098,6 +1179,17 @@ function buildTree({ seed, styleName, speciesName, maxDepth, foliageMult, wildne
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     group.add(mesh);
+
+    if (season.snow && depth > 0 && rng() > 0.5){
+      const snowMesh = new THREE.Mesh(snowGeo, snowMat);
+      const s = radiusTop * 1.5 + 0.03;
+      snowMesh.scale.set(s, s * 0.4, s);
+      snowMesh.position.copy(end).add(new THREE.Vector3(0, radiusTop * 0.35, 0));
+      snowMesh.rotation.y = rng() * Math.PI;
+      snowMesh.castShadow = true;
+      snowMesh.receiveShadow = true;
+      group.add(snowMesh);
+    }
   }
 
   function grow(origin, dir, length, radius, depth){
@@ -1160,9 +1252,10 @@ function buildTree({ seed, styleName, speciesName, maxDepth, foliageMult, wildne
 /* ---------------------------------------------------------------------
    Pot + soil
 --------------------------------------------------------------------- */
-function buildPot(seed, speciesName){
+function buildPot(seed, speciesName, seasonName){
   const rng = mulberry32(seed * 7 + 13);
   const species = SPECIES[speciesName] || SPECIES.maple;
+  const season = SEASONS[seasonName] || SEASONS.summer;
   const hMult = species.potHeightMult, wMult = species.potWidthMult;
   const group = new THREE.Group();
   const potColor = POT_COLORS[Math.floor(rng() * POT_COLORS.length)];
@@ -1198,7 +1291,7 @@ function buildPot(seed, speciesName){
   // textured moss layer covering most of the soil
   const mossLayerMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
-    map: createMossTexture(rng),
+    map: createMossTexture(rng, season.mossTint),
     bumpMap: createMossBumpTexture(rng),
     bumpScale: 0.06,
     roughness: 1.0,
@@ -1229,6 +1322,21 @@ function buildPot(seed, speciesName){
     group.add(mesh);
   }
 
+  // light snow dusting across the moss bed in winter
+  if (season.snow){
+    const snowPatchMat = new THREE.MeshStandardMaterial({ color: 0xf2f5f0, roughness: 0.85 });
+    for (let i = 0; i < 16; i++){
+      const a = rng() * Math.PI * 2;
+      const r = Math.sqrt(rng()) * 0.76 * wMult;
+      const patchGeo = new THREE.CircleGeometry(0.05 + rng() * 0.1, 8);
+      const patch = new THREE.Mesh(patchGeo, snowPatchMat);
+      patch.rotation.x = -Math.PI / 2;
+      patch.position.set(Math.cos(a) * r, 0.082, Math.sin(a) * r);
+      patch.receiveShadow = true;
+      group.add(patch);
+    }
+  }
+
   // ground shadow-catcher disc
   const floorGeo = new THREE.CircleGeometry(6, 48);
   const floorMat = new THREE.ShadowMaterial({ opacity: 0.28 });
@@ -1249,6 +1357,7 @@ let potGroup = null;
 const ui = {
   species: document.getElementById('species'),
   style: document.getElementById('style'),
+  season: document.getElementById('season'),
   depth: document.getElementById('depth'),
   depthVal: document.getElementById('depth-val'),
   foliage: document.getElementById('foliage'),
@@ -1271,6 +1380,7 @@ function currentParams(seed){
     seed,
     styleName: ui.style.value,
     speciesName: ui.species.value,
+    seasonName: ui.season.value,
     maxDepth: parseInt(ui.depth.value, 10),
     foliageMult: parseFloat(ui.foliage.value),
     wildness: parseFloat(ui.wild.value),
@@ -1284,7 +1394,7 @@ function regenerate(newSeed, shouldFit){
   if (potGroup){ scene.remove(potGroup); disposeObject(potGroup); }
 
   treeGroup = buildTree(currentParams(seed));
-  potGroup = buildPot(seed, ui.species.value);
+  potGroup = buildPot(seed, ui.species.value, ui.season.value);
 
   scene.add(potGroup);
   scene.add(treeGroup);
@@ -1297,6 +1407,7 @@ ui.depth.addEventListener('input', () => { ui.depthVal.textContent = ui.depth.va
 ui.foliage.addEventListener('input', () => { ui.foliageVal.textContent = parseFloat(ui.foliage.value).toFixed(1); regenerate(lastSeed); });
 ui.wild.addEventListener('input', () => { ui.wildVal.textContent = parseFloat(ui.wild.value).toFixed(2); regenerate(lastSeed); });
 ui.style.addEventListener('change', () => regenerate(lastSeed, true));
+ui.season.addEventListener('change', () => regenerate(lastSeed, true));
 
 let lastSeed = Math.floor(Math.random() * 1e9);
 ui.sealBtn.addEventListener('click', () => {
